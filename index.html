@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Odia Typing Platform</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  
+  <div class="shell">
+    <section class="hero">
+      <div class="badge">Odia Transliteration Keyboard</div>
+    </section>
+
+    <section class="layout">
+      <div class="card main-card">
+        <!-- <div class="label-row">
+          <h2 class="section-title">Typing Area</h2>
+        </div> -->
+
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <button id="clearBtn" class="btn-secondary">Clear</button>
+          </div>
+          <div class="toolbar-right">
+            <button id="pasteBtn" class="btn-secondary">Paste</button>
+          </div>
+        </div>
+        <div class="output-wrap">
+          <div class="output-header">
+            <h2 class="section-title">Typing Area</h2>
+            <div class="output-actions">
+              <button id="copyBtn" class="btn-primary">Copy Output</button>
+            </div>
+          </div>
+          <div class="editor">
+            <div id="suggestions"></div>
+            <div id="output" contenteditable="true"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="card info-card">
+          <h2 class="section-title">Quick Notes</h2>
+          <div class="info-grid mt-12">
+            <div class="info-item">
+              <strong>Simple rule</strong>
+              <span>Use lowercase for common letters and capitals for special Odia sounds like ଟ, ଠ, ଡ, ଢ, ଣ, ଳ, ଋ, ଙ.</span>
+            </div>
+            <div class="info-item">
+              <strong>Useful examples</strong>
+              <span><b>RuShi</b> → ଋଷି, <b>Ng</b> → ଙ, <b>ny</b> → ନ୍ୟ, <b>nj</b> → ଞ୍ଜ, <b>MM</b> → ଁ</span>
+            </div>
+            <div class="info-item">
+              <strong>Nasal marks</strong>
+              <span><b>M</b> → ଂ and <b>MM</b> → ଁ. Examples: <b>kaMM</b> → କଁ, <b>maamuuMM</b> → ମାମୁଁ, <b>kuaaMM</b> → କୁଆଁ</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card help-card">
+          <h2 class="section-title">Typing Rules</h2>
+          <div class="spacer"></div>
+
+          <details>
+            <summary>Basic vowels and signs</summary>
+            <div class="details-body">
+              <div class="rule-grid">
+                <div class="rule-item"><b>a</b> → <span>ଅ</span></div>
+                <div class="rule-item"><b>aa</b> → <span>ଆ</span></div>
+                <div class="rule-item"><b>i</b> → <span>ଇ</span></div>
+                <div class="rule-item"><b>ii</b> → <span>ଈ</span></div>
+                <div class="rule-item"><b>u</b> → <span>ଉ</span></div>
+                <div class="rule-item"><b>uu</b> → <span>ଊ</span></div>
+                <div class="rule-item"><b>e</b> → <span>ଏ</span></div>
+                <div class="rule-item"><b>ai</b> → <span>ଐ</span></div>
+                <div class="rule-item"><b>o</b> → <span>ଓ</span></div>
+                <div class="rule-item"><b>au</b> → <span>ଔ</span></div>
+                <div class="rule-item"><b>Ru</b> → <span>ଋ</span></div>
+                <div class="rule-item"><b>RRu</b> → <span>ୠ</span></div>
+                <div class="rule-item"><b>M</b> → <span>ଂ</span></div>
+                <div class="rule-item"><b>MM</b> → <span>ଁ</span></div>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Core consonants</summary>
+            <div class="details-body">
+              <div class="rule-grid">
+                <div class="rule-item"><b>k</b> → <span>କ</span></div>
+                <div class="rule-item"><b>kh</b> → <span>ଖ</span></div>
+                <div class="rule-item"><b>g</b> → <span>ଗ</span></div>
+                <div class="rule-item"><b>gh</b> → <span>ଘ</span></div>
+                <div class="rule-item"><b>Ng</b> → <span>ଙ</span></div>
+                <div class="rule-item"><b>c</b> / <b>ch</b> → <span>ଚ</span></div>
+                <div class="rule-item"><b>chh</b> → <span>ଛ</span></div>
+                <div class="rule-item"><b>j</b> → <span>ଜ</span></div>
+                <div class="rule-item"><b>jh</b> → <span>ଝ</span></div>
+                <div class="rule-item"><b>Ny</b> → <span>ଞ</span></div>
+                <div class="rule-item"><b>T</b> → <span>ଟ</span></div>
+                <div class="rule-item"><b>Th</b> → <span>ଠ</span></div>
+                <div class="rule-item"><b>D</b> → <span>ଡ</span></div>
+                <div class="rule-item"><b>Dh</b> → <span>ଢ</span></div>
+                <div class="rule-item"><b>N</b> → <span>ଣ</span></div>
+                <div class="rule-item"><b>t</b> → <span>ତ</span></div>
+                <div class="rule-item"><b>th</b> → <span>ଥ</span></div>
+                <div class="rule-item"><b>d</b> → <span>ଦ</span></div>
+                <div class="rule-item"><b>dh</b> → <span>ଧ</span></div>
+                <div class="rule-item"><b>n</b> → <span>ନ</span></div>
+                <div class="rule-item"><b>p</b> → <span>ପ</span></div>
+                <div class="rule-item"><b>ph</b> → <span>ଫ</span></div>
+                <div class="rule-item"><b>b</b> → <span>ବ</span></div>
+                <div class="rule-item"><b>bh</b> / <b>v</b> → <span>ଭ</span></div>
+                <div class="rule-item"><b>m</b> → <span>ମ</span></div>
+                <div class="rule-item"><b>y</b> → <span>ୟ</span></div>
+                <div class="rule-item"><b>Y</b> → <span>ଯ</span></div>
+                <div class="rule-item"><b>r</b> → <span>ର</span></div>
+                <div class="rule-item"><b>l</b> → <span>ଲ</span></div>
+                <div class="rule-item"><b>L</b> → <span>ଳ</span></div>
+                <div class="rule-item"><b>w</b> → <span>ୱ</span></div>
+                <div class="rule-item"><b>sh</b> → <span>ଶ</span></div>
+                <div class="rule-item"><b>Sh</b> → <span>ଷ</span></div>
+                <div class="rule-item"><b>s</b> → <span>ସ</span></div>
+                <div class="rule-item"><b>h</b> → <span>ହ</span></div>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Special letters and tricky sounds</summary>
+            <div class="details-body">
+              <div class="rule-grid">
+                <div class="rule-item"><b>rD</b> → <span>ଡ଼</span></div>
+                <div class="rule-item"><b>rDh</b> → <span>ଢ଼</span></div>
+                <div class="rule-item"><b>ru</b> → <span>ରୁ</span></div>
+                <div class="rule-item"><b>RuShi</b> → <span>ଋଷି</span></div>
+                <div class="rule-item"><b>kaMM</b> → <span>କଁ</span></div>
+                <div class="rule-item"><b>maamuuMM</b> → <span>ମାମୁଁ</span></div>
+                <div class="rule-item"><b>kuaaMM</b> → <span>କୁଆଁ</span></div>
+                <div class="rule-item"><b>namaha</b> → <span>ନମଃ</span></div>
+                <div class="rule-item"><b>kramashaha</b> → <span>କ୍ରମଶଃ</span></div>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Yuktakshara and common conjuncts</summary>
+            <div class="details-body">
+              <div class="rule-grid">
+                <div class="rule-item"><b>x</b> → <span>୍ (halant)</span></div>
+                <div class="rule-item"><b>ksh</b> → <span>କ୍ଷ</span></div>
+                <div class="rule-item"><b>jna</b> → <span>ଜ୍ଞ</span></div>
+                <div class="rule-item"><b>shri</b> → <span>ଶ୍ରୀ</span></div>
+                <div class="rule-item"><b>ny</b> → <span>ନ୍ୟ</span></div>
+                <div class="rule-item"><b>nj</b> → <span>ଞ୍ଜ</span></div>
+                <div class="rule-item"><b>nk</b> / <b>nka</b> → <span>ଙ୍କ</span></div>
+                <div class="rule-item"><b>nkh</b> → <span>ଙ୍ଖ</span></div>
+                <div class="rule-item"><b>nta</b> → <span>ନ୍ତ</span></div>
+                <div class="rule-item"><b>Nta</b> → <span>ଣ୍ଟ</span></div>
+                <div class="rule-item"><b>nda</b> → <span>ନ୍ଦ</span></div>
+                <div class="rule-item"><b>ndh</b> → <span>ନ୍ଧ</span></div>
+                <div class="rule-item"><b>mb</b> → <span>ମ୍ବ</span></div>
+                <div class="rule-item"><b>mbh</b> → <span>ମ୍ଭ</span></div>
+                <div class="rule-item"><b>mp</b> → <span>ମ୍ପ</span></div>
+                <div class="rule-item"><b>sch</b> → <span>ଶ୍ଚ</span></div>
+                <div class="rule-item"><b>shr</b> → <span>ଶ୍ର</span></div>
+                <div class="rule-item"><b>shn</b> → <span>ଷ୍ଣ</span></div>
+                <div class="rule-item"><b>rya</b> → <span>ର୍ଯ</span></div>
+                <div class="rule-item"><b>ryya</b> → <span>ର୍ଯ୍ୟ</span></div>
+                <div class="rule-item"><b>sx</b> → <span>ସ୍</span></div>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>Conjunct examples used often</summary>
+            <div class="details-body">
+              <div class="rule-grid">
+                <div class="rule-item"><b>kra</b> → <span>କ୍ର</span></div>
+                <div class="rule-item"><b>kri</b> → <span>କ୍ରି</span></div>
+                <div class="rule-item"><b>kru</b> → <span>କ୍ରୁ</span></div>
+                <div class="rule-item"><b>gra</b> → <span>ଗ୍ର</span></div>
+                <div class="rule-item"><b>gri</b> → <span>ଗ୍ରି</span></div>
+                <div class="rule-item"><b>gru</b> → <span>ଗ୍ରୁ</span></div>
+                <div class="rule-item"><b>pra</b> → <span>ପ୍ର</span></div>
+                <div class="rule-item"><b>pri</b> → <span>ପ୍ରି</span></div>
+                <div class="rule-item"><b>pru</b> → <span>ପ୍ରୁ</span></div>
+                <div class="rule-item"><b>bra</b> → <span>ବ୍ର</span></div>
+                <div class="rule-item"><b>bri</b> → <span>ବ୍ରି</span></div>
+                <div class="rule-item"><b>bru</b> → <span>ବ୍ରୁ</span></div>
+                <div class="rule-item"><b>tra</b> → <span>ତ୍ର</span></div>
+                <div class="rule-item"><b>tri</b> → <span>ତ୍ରି</span></div>
+                <div class="rule-item"><b>tru</b> → <span>ତ୍ରୁ</span></div>
+                <div class="rule-item"><b>dra</b> → <span>ଦ୍ର</span></div>
+                <div class="rule-item"><b>dri</b> → <span>ଦ୍ରି</span></div>
+                <div class="rule-item"><b>dru</b> → <span>ଦ୍ରୁ</span></div>
+                <div class="rule-item"><b>kRu</b> → <span>କୃ</span></div>
+                <div class="rule-item"><b>gRu</b> → <span>ଗୃ</span></div>
+                <div class="rule-item"><b>kamx</b> → <span>କମ୍</span></div>
+                <div class="rule-item"><b>sx</b> → <span>ସ୍</span></div>
+                <div class="rule-item"><b>lx</b> → <span>ଲ୍</span></div>
+                <div class="rule-item"><b>kx</b> → <span>କ୍</span></div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </aside>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
