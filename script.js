@@ -441,7 +441,9 @@ const specialSyllables = {
   dRu: "ଦୃ",
   tRu: "ତୃ",
   mRu: "ମୃ",
-  nRu: "ନୃ"
+  nRu: "ନୃ",
+  hRu: "ହୃ",   // ADD THIS
+  rRu: "ରୃ"    // optional but useful
 };
 
 const specialSigns = {
@@ -587,6 +589,8 @@ const tokenOrder = [
   "tRu",
   "mRu",
   "nRu",
+  "hRu",
+  "rRu",
 
   "rDh",
   "rD",
@@ -731,37 +735,35 @@ function transliterateWord(word) {
 
   while (i < word.length) {
 
-    // Visarga rule: ah only at end
-      // Handle "ah" proper
+    // Visarga (ah at end)
+    // Visarga rule inside word (Vowel + h + Consonant)
+    if (word[i] === "h") {
+      let prev = word[i - 1] || "";
+      let next = word[i + 1] || "";
 
-      // Handle h (ହ or visarga)
-      // Handle h (simple and correct)
-if (word[i] === "h") {
-    let prev = word[i - 1] || "";
-    let next = word[i + 1] || "";
+      let vowels = ["a","i","u","e","o","R"];
 
-    let vowels = "aeiou";
+      if (vowels.includes(prev) && next && /[a-zA-Z]/.test(next)) {
+        const nextToken = getMatchedToken(word, i + 1);
+        if (nextToken && isConsonantLikeToken(nextToken)) {
+          result += "ଃ";
+          i += 1;
+          continue;
+        }
+      }
+    }
 
-    // If vowel before h AND consonant after → visarga
-    if (vowels.includes(prev) && next && !vowels.includes(next)) {
+    // Visarga at end of word (vowel + h)
+    if (word[i] === "h" && i === word.length - 1) {
+      let prev = word[i - 1] || "";
+      let vowels = ["a","i","u","e","o","R"];
+
+      if (vowels.includes(prev)) {
         result += "ଃ";
+        i += 1;
+        continue;
+      }
     }
-    // If h before vowel → ହ
-    else if (vowels.includes(next)) {
-        result += "ହ";
-    }
-    // If end of word after vowel → visarga
-    else if (vowels.includes(prev) && !next) {
-        result += "ଃ";
-    }
-    else {
-        result += "ହ";
-    }
-
-    i += 1;
-    continue;
-}
-
     const token = getMatchedToken(word, i);
 
     if (!token) {
@@ -804,6 +806,13 @@ if (word[i] === "h") {
       continue;
     }
 
+    // Special syllables like kRu, gRu
+    if (specialSyllables[token]) {
+      result += specialSyllables[token];
+      i += token.length;
+      continue;
+    }
+
     // Conjuncts
     if (conjuncts[token]) {
       const base = conjuncts[token];
@@ -841,7 +850,7 @@ if (word[i] === "h") {
 
     i++;
   }
-    // Correct visarga handling (based on original input)
+
   // Fix combinations
   result = result
     .replace(/ଅା/g, "ଆ")
@@ -857,10 +866,15 @@ if (word[i] === "h") {
     .replace(/ସ୍ତ୍ରି/g, "ସ୍ତ୍ରୀ")
     .replace(/କ୍ତ୍ରି/g, "କ୍ତ୍ରୀ")
     .replace(/ନମହ/g, "ନମଃ")
-    .replace(/କ୍ରମଶହ/g, "କ୍ରମଶଃ");
+    .replace(/କ୍ରମଶହ/g, "କ୍ରମଶଃ")
+    .replace(/ହଇ/g, "ହି")
+    .replace(/ହଉ/g, "ହୁ")
+    .replace(/ହଏ/g, "ହେ")
+    .replace(/ହଓ/g, "ହୋ");
 
   return result;
 }
+
 function transliterateText(text) {
   let result = "";
   let currentWord = "";
