@@ -14,7 +14,9 @@ if (!output) {
 
 let englishBuffer = "";
 let committedText = "";
-
+let leftText = "";
+let rightText = "";
+let lastPreview = "";
 /* =========================
    LOAD LANGUAGE MODELS
 ========================= */
@@ -80,7 +82,8 @@ function placeCursorEnd(el) {
 }
 
 function predictNextWord() {
-    const text = committedText.replace(/\u00A0/g, " ").trim();
+    const text = leftText.replace(/\u00A0/g, " ").trim();
+
     if (!text) return [];
 
     const words = text.split(/\s+/);
@@ -141,22 +144,17 @@ function showSuggestions(list) {
     });
 }
 
-
+//insert suggestion
 function insertSuggestion(word) {
-    if (englishBuffer.length > 0) {
-        committedText = committedText+ " " + word;
-        englishBuffer = "";
-    } else {
-        committedText = committedText + " " + word;
-    }
+    splitTextByCursor();
 
-    committedText += " ";
+    leftText += word + " ";
+    englishBuffer = "";
 
     updateOutput();
-    output.focus();
-
-    placeCursorEnd(output);
 }
+
+
 /* =========================
    OUTPUT UPDATE
 ========================= */
@@ -174,6 +172,68 @@ function updateSuggestions() {
     showSuggestions(suggestions);
 }
 
+
+//cursor point
+
+function getCursorPosition() {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return 0;
+
+    const range = selection.getRangeAt(0);
+    const preRange = range.cloneRange();
+
+    preRange.selectNodeContents(output);
+    preRange.setEnd(range.endContainer, range.endOffset);
+
+    return preRange.toString().length;
+}
+
+function restoreCursor() {
+    const pos = leftText.length + transliterateWord(englishBuffer).length;
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+
+    let charIndex = 0;
+
+    function walk(node) {
+        if (node.nodeType === 3) {
+            let nextIndex = charIndex + node.length;
+
+            if (pos <= nextIndex) {
+                range.setStart(node, pos - charIndex);
+                range.collapse(true);
+                return true;
+            }
+
+            charIndex = nextIndex;
+        } else {
+            for (let child of node.childNodes) {
+                if (walk(child)) return true;
+            }
+        }
+        return false;
+    }
+
+    walk(output);
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function splitTextByCursor() {
+
+    // If typing a word → don't break buffer
+    if (englishBuffer.length > 0) return;
+
+    const pos = getCursorPosition();
+
+    const fullText = (leftText + rightText).replace(/\u00A0/g, " ");
+
+    leftText = fullText.slice(0, pos);
+    rightText = fullText.slice(pos);
+}
+
 /* =========================
    KEYBOARD INPUT
 ========================= */
@@ -181,14 +241,13 @@ function updateSuggestions() {
 function updateOutput() {
     const preview = transliterateWord(englishBuffer);
 
-    let text = committedText + preview;
+    let text = leftText + preview + rightText;
 
     text = text.replace(/ /g, "\u00A0");
 
-    output.innerText = text;
+    output.textContent = text;
 
-    placeCursorEnd(output);
-
+    restoreCursor();
     updateSuggestions();
 }
 
@@ -212,19 +271,45 @@ const odiaNumbers = {
   "9": "୯"
 };
 
+output.addEventListener("click", () => {
+    splitTextByCursor();
+});
+
 output.addEventListener("beforeinput", (e) => {
 
+    const selection = window.getSelection();
+
+    /* =========================
+       HANDLE SELECTION DELETE
+    ========================= */
+    if (selection && !selection.isCollapsed) {
+        e.preventDefault();
+
+        // Only split here (safe)
+        splitTextByCursor();
+
+        rightText = rightText.slice(selection.toString().length);
+
+        updateOutput();
+        return;
+    }
+
+    /* =========================
+       INSERT TEXT
+    ========================= */
     if (e.inputType === "insertText") {
 
         const ch = e.data;
 
         /* =========================
-           LETTERS
+           LETTERS (DO NOT SPLIT HERE)
         ========================= */
-
         if (/^[a-zA-Z]$/.test(ch)) {
             e.preventDefault();
+
+            // Keep building same word
             englishBuffer += ch;
+
             updateOutput();
             return;
         }
@@ -232,39 +317,38 @@ output.addEventListener("beforeinput", (e) => {
         /* =========================
            SPACE
         ========================= */
-
         if (ch === " ") {
             e.preventDefault();
 
+            splitTextByCursor(); // split ONLY here
+
             if (englishBuffer.length > 0) {
-                committedText += transliterateWord(englishBuffer);
+                leftText += transliterateWord(englishBuffer);
                 englishBuffer = "";
             }
 
-            committedText += " ";
+            leftText += " ";
 
             updateOutput();
+            showSuggestions(predictNextWord());
 
-            const nextSuggestions = predictNextWord();
-            showSuggestions(nextSuggestions);
-
-            lastChar = " ";
             return;
         }
 
         /* =========================
-           ODIA NUMBERS
+           NUMBERS
         ========================= */
-
         if (/[0-9]/.test(ch)) {
             e.preventDefault();
 
+            splitTextByCursor();
+
             if (englishBuffer.length > 0) {
-                committedText += transliterateWord(englishBuffer);
+                leftText += transliterateWord(englishBuffer);
                 englishBuffer = "";
             }
 
-            committedText += odiaNumbers[ch];
+            leftText += odiaNumbers[ch];
 
             updateOutput();
             lastChar = odiaNumbers[ch];
@@ -274,13 +358,14 @@ output.addEventListener("beforeinput", (e) => {
         /* =========================
            RUPEE SYMBOL
         ========================= */
-
         if (ch === "$") {
             e.preventDefault();
 
-            committedText += "₹";
-            updateOutput();
+            splitTextByCursor();
 
+            leftText += "₹";
+
+            updateOutput();
             lastChar = "₹";
             return;
         }
@@ -288,81 +373,90 @@ output.addEventListener("beforeinput", (e) => {
         /* =========================
            PUNCTUATION
         ========================= */
-
         if ([".", ",", "?", "!"].includes(ch)) {
-
             e.preventDefault();
 
+            splitTextByCursor();
+
             if (englishBuffer.length > 0) {
-                committedText += transliterateWord(englishBuffer);
+                leftText += transliterateWord(englishBuffer);
                 englishBuffer = "";
             }
 
             if (ch === ".") {
-
-                // Double Purnacheda
                 if (lastChar === "।") {
-                    committedText = committedText.slice(0, -1);
-                    committedText += "॥";
+                    leftText = leftText.slice(0, -1);
+                    leftText += "॥";
                     lastChar = "॥";
-                } 
-                else {
-                    committedText += "।";
+                } else {
+                    leftText += "।";
                     lastChar = "।";
                 }
-
-            } 
-            else {
-                committedText += ch;
+            } else {
+                leftText += ch;
                 lastChar = ch;
             }
 
             updateOutput();
             return;
         }
-
     }
 
     /* =========================
        BACKSPACE
     ========================= */
-
     if (e.inputType === "deleteContentBackward") {
         e.preventDefault();
 
         if (englishBuffer.length > 0) {
+            // delete inside current word
             englishBuffer = englishBuffer.slice(0, -1);
-        } 
-        else {
-            committedText = committedText.slice(0, -1);
+        } else {
+            splitTextByCursor(); // split ONLY here
+            leftText = leftText.slice(0, -1);
         }
 
         updateOutput();
+        return;
     }
 
     /* =========================
-       DISABLE ENTER
+       DELETE FORWARD
     ========================= */
-
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
-
+    if (e.inputType === "deleteContentForward") {
         e.preventDefault();
 
+        splitTextByCursor();
+
+        if (rightText.length > 0) {
+            rightText = rightText.slice(1);
+        }
+
+        updateOutput();
+        return;
+    }
+
+    /* =========================
+       ENTER
+    ========================= */
+    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
+        e.preventDefault();
+
+        splitTextByCursor();
+
         if (englishBuffer.length > 0) {
-            committedText += transliterateWord(englishBuffer);
+            leftText += transliterateWord(englishBuffer);
             englishBuffer = "";
         }
 
-        committedText += "\n";
+        leftText += "\n";
 
         updateOutput();
-
         lastChar = "\n";
         return;
     }
 
 });
-
 
 // output.addEventListener("keydown", (e) => {
 //     if (e.key === " ") {
@@ -493,6 +587,9 @@ const consonants = {
 };
 
 const conjuncts = {
+  shrii: "ଶ୍ରୀ",
+  shri: "ଶ୍ରି",
+  shr: "ଶ୍ର",
 
   strii: "ସ୍ତ୍ରୀ",
   stri: "ସ୍ତ୍ରି",
@@ -506,7 +603,7 @@ const conjuncts = {
   kShmi: "କ୍ଷ୍ମି",
   kShmii: "କ୍ଷ୍ମୀ",
 
-  shri: "ଶ୍ରୀ",
+  
   ksh: "କ୍ଷ",
   jna: "ଜ୍ଞ",
 
@@ -525,7 +622,6 @@ const conjuncts = {
   mp: "ମ୍ପ",
   nj: "ଞ୍ଜ",
 
-  shr: "ଶ୍ର",
   shn: "ଷ୍ଣ",
   sch: "ଶ୍ଚ",
   ryya: "ର୍ଯ୍ୟ",
@@ -561,6 +657,10 @@ const conjuncts = {
 };
 
 const tokenOrder = [
+  "shrii",
+  "shri",
+  "shr",
+
   "strii",
   "stri",
   "str",
@@ -574,7 +674,6 @@ const tokenOrder = [
   "kShma",
   "kShm",
 
-  "shri",
   "ksh",
   "jna",
 
@@ -615,7 +714,7 @@ const tokenOrder = [
   "mp",
   "nj",
 
-  "shr",
+  //"shr",
   "shn",
   "rya",
 
@@ -862,7 +961,7 @@ function transliterateWord(word) {
     .replace(/ଅୈ/g, "ଐ")
     .replace(/ଅୋ/g, "ଓ")
     .replace(/ଅୌ/g, "ଔ")
-    .replace(/ଶ୍ରି/g, "ଶ୍ରୀ")
+    //.replace(/ଶ୍ରି/g, "ଶ୍ରୀ")
     .replace(/ସ୍ତ୍ରି/g, "ସ୍ତ୍ରୀ")
     .replace(/କ୍ତ୍ରି/g, "କ୍ତ୍ରୀ")
     .replace(/ନମହ/g, "ନମଃ")
