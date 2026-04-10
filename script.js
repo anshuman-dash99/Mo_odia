@@ -2,496 +2,362 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const output = document.getElementById("output");
 const suggestionsBox = document.getElementById("suggestions");
-
 const clearBtn = document.getElementById("clearBtn");
 const copyBtn = document.getElementById("copyBtn");
 const pasteBtn = document.getElementById("pasteBtn");
+const themeToggle = document.getElementById("themeToggle");
+// const pdfBtn = document.getElementById("downloadPdf");
+const txtBtn = document.getElementById("downloadTxt");
 
-if (!output) {
-    console.error("Output div not found");
-    return;
-}
+if (!output) return;
 
-let englishBuffer = "";
-let committedText = "";
-let leftText = "";
-let rightText = "";
-let lastPreview = "";
+output.contentEditable = true;
+
 /* =========================
-   LOAD LANGUAGE MODELS
+   THEME (🌗)
 ========================= */
-let trie = {};
-let bigram = {};
-let trigram = {};
+// if (localStorage.getItem("theme") === "light") {
+//   document.body.classList.add("light");
+// }
+const updateThemeIcon = () => {
+  themeToggle.textContent = document.body.classList.contains("light")
+    ? "☀️ Light"
+    : "🌙 Dark";
+};
+themeToggle?.addEventListener("click", () => {
+  document.body.classList.toggle("light");
+
+  localStorage.setItem(
+    "theme",
+    document.body.classList.contains("light") ? "light" : "dark"
+  );
+});
+
+/* =========================
+   AUTO SAVE 💾
+========================= */
+const saveContent = () => {
+  localStorage.setItem("odia_text", output.innerHTML);
+};
+
+output.addEventListener("input", saveContent);
+
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("odia_text");
+  if (saved) {
+    output.innerHTML = saved;
+  }
+});
+
+/* =========================
+//    PDF EXPORT 📄
+// ========================= */
+// pdfBtn?.addEventListener("click", () => {
+//   const opt = {
+//     margin: 10,
+//     filename: "odia-typing.pdf",
+//     image: { type: "jpeg", quality: 1 },
+//     html2canvas: { scale: 2 },
+//     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+//   };
+
+//   html2pdf().set(opt).from(output).save();
+// });
+
+// TEXT EXPORT
+txtBtn?.addEventListener("click", () => {
+  const text = output.innerText;
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "odia-text.txt";
+  a.click();
+
+  URL.revokeObjectURL(url);
+});
+/* =========================
+   STATE
+========================= */
+let englishBuffer = "";
+let wordStartOffset = null;
+let activeNode = null;
+
+/* =========================
+   LANGUAGE MODELS
+========================= */
+let trie = {}, bigram = {}, trigram = {};
 
 async function loadModels() {
   trie = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/unigram.json").then(r => r.json());
   bigram = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/bigram.json").then(r => r.json());
   trigram = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/trigram.json").then(r => r.json());
-  console.log("All models loaded");
 }
 loadModels();
-  // trie = "unigram.json";
-  // bigram = "bigram.json";
-  // trigram = "trigram.json";
 
 /* =========================
-   PREDICTION
+   HELPERS
 ========================= */
-
-function getTrieSuggestions(prefix, limit = 5) {
-    if (!prefix) return [];
-
-    const results = [];
-
-    for (let word in trie) {
-        if (word.startsWith(prefix)) {
-            results.push([word, trie[word]]);
-        }
-    }
-
-    // Sort by frequency
-    results.sort((a, b) => b[1] - a[1]);
-
-    return results.slice(0, limit).map(r => r[0]);
+function ensureTextNode() {
+  if (!output.firstChild) {
+    output.appendChild(document.createTextNode(""));
+  }
 }
 
-function getBigramSuggestions(prevWord, limit = 5) {
-    if (!bigram[prevWord]) return [];
+function getSafeNode() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return null;
 
-    return Object.entries(bigram[prevWord])
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, limit)
-        .map(e => e[0]);
-}
+  let node = sel.getRangeAt(0).startContainer;
 
-function getTrigramSuggestions(w1, w2, limit = 5) {
-    const key = w1 + " " + w2;
-    if (!trigram[key]) return [];
+  if (node.nodeType !== 3) {
+    const textNode = document.createTextNode("");
+    node.appendChild(textNode);
 
-    return Object.entries(trigram[key])
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, limit)
-        .map(e => e[0]);
-}
+    const range = document.createRange();
+    range.setStart(textNode, 0);
+    range.collapse(true);
 
-function placeCursorEnd(el) {
-    el.focus();
-    document.execCommand("selectAll", false, null);
-    document.getSelection().collapseToEnd();
-}
+    sel.removeAllRanges();
+    sel.addRange(range);
 
-function predictNextWord() {
-    const text = leftText.replace(/\u00A0/g, " ").trim();
-
-    if (!text) return [];
-
-    const words = text.split(/\s+/);
-    const n = words.length;
-
-    if (n >= 2) {
-        const tri = getTrigramSuggestions(words[n-2], words[n-1]);
-        if (tri.length) return tri;
-    }
-
-    if (n >= 1) {
-        const bi = getBigramSuggestions(words[n-1]);
-        if (bi.length) return bi;
-    }
-
-    return [];
-}
-
-function getSuggestions() {
-    let trieSug = [];
-
-    if (englishBuffer.length > 0) {
-        const odiaWord = transliterateWord(englishBuffer);
-        trieSug = getTrieSuggestions(odiaWord);
-    }
-
-    let nextSug = predictNextWord();
-
-    let combined = [...new Set([...trieSug, ...nextSug])];
-
-    return combined.slice(0, 5);
+    return textNode;
+  }
+  return node;
 }
 
 /* =========================
-   SUGGESTIONS UI
+   WORD REPLACEMENT
+========================= */
+function replaceWord(newWord) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+
+  ensureTextNode();
+
+  const range = sel.getRangeAt(0);
+  let node = getSafeNode();
+
+  if (wordStartOffset === null || activeNode !== node) {
+    wordStartOffset = range.startOffset;
+    activeNode = node;
+  }
+
+  const text = node.textContent;
+
+  const before = text.slice(0, wordStartOffset);
+  const after = text.slice(range.startOffset);
+
+  node.textContent = before + newWord + after;
+
+  const newPos = before.length + newWord.length;
+
+  const newRange = document.createRange();
+  newRange.setStart(node, newPos);
+  newRange.collapse(true);
+
+  sel.removeAllRanges();
+  sel.addRange(newRange);
+}
+
+/* =========================
+   RESET
+========================= */
+function resetState() {
+  englishBuffer = "";
+  wordStartOffset = null;
+  activeNode = null;
+}
+
+/* =========================
+   SUGGESTIONS
+========================= */
+function getTrieSuggestions(prefix, limit = 5) {
+  if (!prefix) return [];
+
+  return Object.entries(trie)
+    .filter(([w]) => w.startsWith(prefix))
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(e => e[0]);
+}
+
+function predictNextWord(limit = 5) {
+  const text = output.innerText.trim();
+  if (!text) return [];
+
+  const words = text.split(/\s+/);
+  const n = words.length;
+
+  if (n >= 2) {
+    const key = words[n - 2] + " " + words[n - 1];
+    if (trigram[key]) {
+      return Object.entries(trigram[key])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(e => e[0]);
+    }
+  }
+
+  if (n >= 1 && bigram[words[n - 1]]) {
+    return Object.entries(bigram[words[n - 1]])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(e => e[0]);
+  }
+
+  return [];
+}
+
+/* =========================
+   UI
 ========================= */
 function showSuggestions(list) {
-    suggestionsBox.innerHTML = "";
+  suggestionsBox.innerHTML = "";
 
-    if (!list || list.length === 0) {
-        suggestionsBox.style.display = "none";
-        return;
-    }
+  if (!list || list.length === 0) {
+    suggestionsBox.style.display = "none";
+    return;
+  }
 
-    suggestionsBox.style.display = "flex";
+  suggestionsBox.style.display = "flex";
 
-    list.forEach(word => {
-        const el = document.createElement("span");
-        el.className = "suggestion";
-        el.innerText = word;
+  list.forEach(word => {
+    const el = document.createElement("span");
+    el.className = "suggestion";
+    el.innerText = word;
 
-        el.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            insertSuggestion(word);
-        });
+    el.onmousedown = (e) => {
+      e.preventDefault();
+      insertSuggestion(word);
+    };
 
-        suggestionsBox.appendChild(el);
-    });
+    suggestionsBox.appendChild(el);
+  });
 }
 
-//insert suggestion
 function insertSuggestion(word) {
-    splitTextByCursor();
-
-    leftText += word + " ";
-    englishBuffer = "";
-
-    updateOutput();
-}
-
-
-/* =========================
-   OUTPUT UPDATE
-========================= */
-
-function updateSuggestions() {
-    let suggestions = [];
-
-    if (englishBuffer.length > 0) {
-        const odiaWord = transliterateWord(englishBuffer);
-        suggestions = getTrieSuggestions(odiaWord);
-    } else {
-        suggestions = predictNextWord();
-    }
-
-    showSuggestions(suggestions);
-}
-
-
-//cursor point
-
-function getCursorPosition() {
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return 0;
-
-    const range = selection.getRangeAt(0);
-    const preRange = range.cloneRange();
-
-    preRange.selectNodeContents(output);
-    preRange.setEnd(range.endContainer, range.endOffset);
-
-    return preRange.toString().length;
-}
-
-function restoreCursor() {
-    const pos = leftText.length + transliterateWord(englishBuffer).length;
-
-    const selection = window.getSelection();
-    const range = document.createRange();
-
-    let charIndex = 0;
-
-    function walk(node) {
-        if (node.nodeType === 3) {
-            let nextIndex = charIndex + node.length;
-
-            if (pos <= nextIndex) {
-                range.setStart(node, pos - charIndex);
-                range.collapse(true);
-                return true;
-            }
-
-            charIndex = nextIndex;
-        } else {
-            for (let child of node.childNodes) {
-                if (walk(child)) return true;
-            }
-        }
-        return false;
-    }
-
-    walk(output);
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-}
-
-function splitTextByCursor() {
-
-    // If typing a word → don't break buffer
-    if (englishBuffer.length > 0) return;
-
-    const pos = getCursorPosition();
-
-    const fullText = (leftText + rightText).replace(/\u00A0/g, " ");
-
-    leftText = fullText.slice(0, pos);
-    rightText = fullText.slice(pos);
+  replaceWord(word);
+  document.execCommand("insertText", false, " ");
+  resetState();
+  showSuggestions([]);
 }
 
 /* =========================
-   KEYBOARD INPUT
+   INPUT HANDLER
 ========================= */
-
-function updateOutput() {
-    const preview = transliterateWord(englishBuffer);
-
-    let text = leftText + preview + rightText;
-
-    text = text.replace(/ /g, "\u00A0");
-
-    output.textContent = text;
-
-    restoreCursor();
-    updateSuggestions();
-}
-
-
-/* =========================
-   MOBILE + DESKTOP INPUT
-========================= */
-
-let lastChar = "";
-
-const odiaNumbers = {
-  "0": "୦",
-  "1": "୧",
-  "2": "୨",
-  "3": "୩",
-  "4": "୪",
-  "5": "୫",
-  "6": "୬",
-  "7": "୭",
-  "8": "୮",
-  "9": "୯"
-};
-
-output.addEventListener("click", () => {
-    splitTextByCursor();
-});
-
 output.addEventListener("beforeinput", (e) => {
 
-    const selection = window.getSelection();
+  if (e.inputType === "insertText" && /^[a-zA-Z]$/.test(e.data)) {
+    e.preventDefault();
 
-    /* =========================
-       HANDLE SELECTION DELETE
-    ========================= */
-    if (selection && !selection.isCollapsed) {
-        e.preventDefault();
+    englishBuffer += e.data;
 
-        // Only split here (safe)
-        splitTextByCursor();
+    const odia = transliterateWord(englishBuffer);
+    replaceWord(odia);
 
-        rightText = rightText.slice(selection.toString().length);
+    showSuggestions(getTrieSuggestions(odia));
+    return;
+  }
 
-        updateOutput();
-        return;
+  if (e.inputType === "insertText" && e.data === " ") {
+    e.preventDefault();
+
+    const odia = transliterateWord(englishBuffer);
+    replaceWord(odia);
+
+    document.execCommand("insertText", false, " ");
+    resetState();
+
+    showSuggestions(predictNextWord());
+    return;
+  }
+
+  if (e.inputType === "insertParagraph") {
+    e.preventDefault();
+
+    const odia = transliterateWord(englishBuffer);
+    replaceWord(odia);
+
+    document.execCommand("insertLineBreak");
+    resetState();
+    return;
+  }
+
+  if (e.inputType === "insertText" && /[0-9]/.test(e.data)) {
+    e.preventDefault();
+
+    const map = ["୦","୧","୨","୩","୪","୫","୬","୭","୮","୯"];
+    document.execCommand("insertText", false, map[e.data]);
+    resetState();
+    return;
+  }
+
+  if (e.inputType === "insertText" && e.data === "$") {
+    e.preventDefault();
+    document.execCommand("insertText", false, "₹");
+    return;
+  }
+
+  if (e.inputType === "insertText" && e.data === ".") {
+    e.preventDefault();
+    document.execCommand("insertText", false, "।");
+    return;
+  }
+
+  if (e.inputType === "insertText" && e.data === ",") {
+    e.preventDefault();
+    document.execCommand("insertText", false, ",");
+    return;
+  }
+
+  if (e.inputType === "deleteContentBackward") {
+    if (englishBuffer.length > 0) {
+      e.preventDefault();
+      englishBuffer = englishBuffer.slice(0, -1);
+      replaceWord(transliterateWord(englishBuffer));
+    } else {
+      resetState();
     }
-
-    /* =========================
-       INSERT TEXT
-    ========================= */
-    if (e.inputType === "insertText") {
-
-        const ch = e.data;
-
-        /* =========================
-           LETTERS (DO NOT SPLIT HERE)
-        ========================= */
-        if (/^[a-zA-Z]$/.test(ch)) {
-            e.preventDefault();
-
-            // Keep building same word
-            englishBuffer += ch;
-
-            updateOutput();
-            return;
-        }
-
-        /* =========================
-           SPACE
-        ========================= */
-        if (ch === " ") {
-            e.preventDefault();
-
-            splitTextByCursor(); // split ONLY here
-
-            if (englishBuffer.length > 0) {
-                leftText += transliterateWord(englishBuffer);
-                englishBuffer = "";
-            }
-
-            leftText += " ";
-
-            updateOutput();
-            showSuggestions(predictNextWord());
-
-            return;
-        }
-
-        /* =========================
-           NUMBERS
-        ========================= */
-        if (/[0-9]/.test(ch)) {
-            e.preventDefault();
-
-            splitTextByCursor();
-
-            if (englishBuffer.length > 0) {
-                leftText += transliterateWord(englishBuffer);
-                englishBuffer = "";
-            }
-
-            leftText += odiaNumbers[ch];
-
-            updateOutput();
-            lastChar = odiaNumbers[ch];
-            return;
-        }
-
-        /* =========================
-           RUPEE SYMBOL
-        ========================= */
-        if (ch === "$") {
-            e.preventDefault();
-
-            splitTextByCursor();
-
-            leftText += "₹";
-
-            updateOutput();
-            lastChar = "₹";
-            return;
-        }
-
-        /* =========================
-           PUNCTUATION
-        ========================= */
-        if ([".", ",", "?", "!"].includes(ch)) {
-            e.preventDefault();
-
-            splitTextByCursor();
-
-            if (englishBuffer.length > 0) {
-                leftText += transliterateWord(englishBuffer);
-                englishBuffer = "";
-            }
-
-            if (ch === ".") {
-                if (lastChar === "।") {
-                    leftText = leftText.slice(0, -1);
-                    leftText += "॥";
-                    lastChar = "॥";
-                } else {
-                    leftText += "।";
-                    lastChar = "।";
-                }
-            } else {
-                leftText += ch;
-                lastChar = ch;
-            }
-
-            updateOutput();
-            return;
-        }
-    }
-
-    /* =========================
-       BACKSPACE
-    ========================= */
-    if (e.inputType === "deleteContentBackward") {
-        e.preventDefault();
-
-        if (englishBuffer.length > 0) {
-            // delete inside current word
-            englishBuffer = englishBuffer.slice(0, -1);
-        } else {
-            splitTextByCursor(); // split ONLY here
-            leftText = leftText.slice(0, -1);
-        }
-
-        updateOutput();
-        return;
-    }
-
-    /* =========================
-       DELETE FORWARD
-    ========================= */
-    if (e.inputType === "deleteContentForward") {
-        e.preventDefault();
-
-        splitTextByCursor();
-
-        if (rightText.length > 0) {
-            rightText = rightText.slice(1);
-        }
-
-        updateOutput();
-        return;
-    }
-
-    /* =========================
-       ENTER
-    ========================= */
-    if (e.inputType === "insertParagraph" || e.inputType === "insertLineBreak") {
-        e.preventDefault();
-
-        splitTextByCursor();
-
-        if (englishBuffer.length > 0) {
-            leftText += transliterateWord(englishBuffer);
-            englishBuffer = "";
-        }
-
-        leftText += "\n";
-
-        updateOutput();
-        lastChar = "\n";
-        return;
-    }
-
+  }
 });
 
-// output.addEventListener("keydown", (e) => {
-//     if (e.key === " ") {
-//         e.preventDefault();
+/* =========================
+   CURSOR RESET
+========================= */
+output.addEventListener("mouseup", () => {
+  resetState();
+  showSuggestions([]);
+});
 
-//         if (englishBuffer.length > 0) {
-//             committedText = committedText;
-//             committedText += " " +transliterateWord(englishBuffer);
-//             englishBuffer = "";
-//         }
-        
-//         committedText += " ";
-//         updateOutput();
-//     }
-// });
+output.addEventListener("keyup", (e) => {
+  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) {
+    resetState();
+    showSuggestions([]);
+  }
+});
 
 /* =========================
    BUTTONS
 ========================= */
-clearBtn.addEventListener("click", () => {
-  output.innerText = "";
-  englishBuffer = "";
-  suggestionsBox.innerHTML = "";
-  output.focus();
-});
+clearBtn.onclick = () => {
+  output.innerHTML = "";
+  localStorage.removeItem("odia_text");
+};
 
-copyBtn.addEventListener("click", async () => {
-  await navigator.clipboard.writeText(output.textContent);
-});
+copyBtn.onclick = () => {
+  navigator.clipboard.writeText(output.innerText);
+};
 
-pasteBtn.addEventListener("click", async () => {
+pasteBtn.onclick = async () => {
   const text = await navigator.clipboard.readText();
-  englishBuffer += text;
-  updateOutput();
-});
+  document.execCommand("insertText", false, text);
+};
+
+/* =========================
+
 /* =========================
    YOUR TRANSLITERATION RULE ENGINE
    (UNCHANGED FROM YOUR CODE)
@@ -962,10 +828,10 @@ function transliterateWord(word) {
     .replace(/ଅୋ/g, "ଓ")
     .replace(/ଅୌ/g, "ଔ")
     //.replace(/ଶ୍ରି/g, "ଶ୍ରୀ")
-    .replace(/ସ୍ତ୍ରି/g, "ସ୍ତ୍ରୀ")
+    // .replace(/ସ୍ତ୍ରି/g, "ସ୍ତ୍ରୀ")
     .replace(/କ୍ତ୍ରି/g, "କ୍ତ୍ରୀ")
-    .replace(/ନମହ/g, "ନମଃ")
-    .replace(/କ୍ରମଶହ/g, "କ୍ରମଶଃ")
+    // .replace(/ନମହ/g, "ନମଃ")
+    // .replace(/କ୍ରମଶହ/g, "କ୍ରମଶଃ")
     .replace(/ହଇ/g, "ହି")
     .replace(/ହଉ/g, "ହୁ")
     .replace(/ହଏ/g, "ହେ")
