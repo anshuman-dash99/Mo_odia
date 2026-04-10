@@ -4,29 +4,41 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Odia Typing Platform</title>
+
+  <!-- Odia Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Odia&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  
+
   <div class="shell">
+    
     <section class="hero">
       <div class="badge">Odia Transliteration Keyboard</div>
     </section>
 
     <section class="layout">
-      <div class="card main-card">
-        <!-- <div class="label-row">
-          <h2 class="section-title">Typing Area</h2>
-        </div> -->
 
+      <!-- MAIN -->
+      <div class="card main-card">
+
+        <!-- TOOLBAR -->
         <div class="toolbar">
           <div class="toolbar-left">
             <button id="clearBtn" class="btn-secondary">Clear</button>
           </div>
+
           <div class="toolbar-right">
             <button id="pasteBtn" class="btn-secondary">Paste</button>
+            <button id="themeToggle" class="btn-secondary">🌙 Theme</button>
+            <!-- <button id="downloadPdf" class="btn-primary">Export PDF</button> -->
+             <button id="downloadTxt" class="btn-primary">Export TXT</button>
           </div>
         </div>
+
+        <!-- OUTPUT -->
         <div class="output-wrap">
           <div class="output-header">
             <h2 class="section-title">Typing Area</h2>
@@ -34,41 +46,50 @@
               <button id="copyBtn" class="btn-primary">Copy Output</button>
             </div>
           </div>
+
           <div class="editor">
             <div id="suggestions"></div>
             <div id="output" contenteditable="true"></div>
           </div>
         </div>
+
       </div>
 
+      <!-- SIDE PANEL -->
       <aside class="side-panel">
+
+        <!-- QUICK NOTES -->
         <div class="card info-card">
           <h2 class="section-title">Quick Notes</h2>
+
           <div class="info-grid mt-12">
             <div class="info-item">
               <strong>Simple rule</strong>
               <span>Use lowercase for common letters and capitals for special Odia sounds like ଟ, ଠ, ଡ, ଢ, ଣ, ଳ, ଋ, ଙ.</span>
             </div>
+
             <div class="info-item">
               <strong>Useful examples</strong>
-              <span><b>RuShi</b> → ଋଷି, <b>Ng</b> → ଙ, <b>ny</b> → ନ୍ୟ, <b>nj</b> → ଞ୍ଜ, <b>MM</b> → ଁ, <b>.</b> → ।,</span>
+              <span><b>RuShi</b> → ଋଷି, <b>Ng</b> → ଙ, <b>ny</b> → ନ୍ୟ, <b>nj</b> → ଞ୍ଜ, <b>MM</b> → ଁ, <b>ksh</b> → କ୍ଷ, <b>.</b> → ।</span>
             </div>
+
             <div class="info-item">
               <strong>Nasal marks</strong>
-              <span><b>M</b> → ଂ and <b>MM</b> → ଁ. Examples: <b>kaMM</b> → କଁ, <b>maamuMM</b> → ମାମୁଁ, <b>kuaaMM</b> → କୁଆଁ</span>
+              <span><b>M</b> → ଂ and <b>MM</b> → ଁ. Example: <b>maamuMM</b> → ମାମୁଁ</span>
             </div>
           </div>
         </div>
 
+        <!-- HELP -->
         <div class="card help-card">
           <h2 class="section-title">Typing Rules</h2>
+
           <div class="spacer"></div>
 
           <details>
-            <summary>Basic vowels and signs</summary>
+            <summary>Basic vowels</summary>
             <div class="details-body">
               <div class="rule-grid">
-                <div class="rule-item"><b>a</b> → <span>ଅ</span></div>
                 <div class="rule-item"><b>aa</b> → <span>ଆ</span></div>
                 <div class="rule-item"><b>i</b> → <span>ଇ</span></div>
                 <div class="rule-item"><b>ii</b> → <span>ଈ</span></div>
@@ -87,7 +108,7 @@
           </details>
 
           <details>
-            <summary>Core consonants</summary>
+            <summary>Common consonants</summary>
             <div class="details-body">
               <div class="rule-grid">
                 <div class="rule-item"><b>k</b> → <span>କ</span></div>
@@ -128,7 +149,6 @@
               </div>
             </div>
           </details>
-
           <details>
             <summary>Special letters and tricky sounds</summary>
             <div class="details-body">
@@ -138,10 +158,10 @@
                 <div class="rule-item"><b>ru</b> → <span>ରୁ</span></div>
                 <div class="rule-item"><b>RuShi</b> → <span>ଋଷି</span></div>
                 <div class="rule-item"><b>kaMM</b> → <span>କଁ</span></div>
-                <div class="rule-item"><b>maamuuMM</b> → <span>ମାମୁଁ</span></div>
+                <div class="rule-item"><b>maamuMM</b> → <span>ମାମୁଁ</span></div>
                 <div class="rule-item"><b>kuaaMM</b> → <span>କୁଆଁ</span></div>
-                <div class="rule-item"><b>namah</b> → <span>ନମଃ</span></div>
-                <div class="rule-item"><b>kramashah</b> → <span>କ୍ରମଶଃ</span></div>
+                <div class="rule-item"><b>namaha</b> → <span>ନମଃ</span></div>
+                <div class="rule-item"><b>kramashaha</b> → <span>କ୍ରମଶଃ</span></div>
               </div>
             </div>
           </details>
@@ -153,6 +173,7 @@
                 <div class="rule-item"><b>x</b> → <span>୍ (halant)</span></div>
                 <div class="rule-item"><b>ksh</b> → <span>କ୍ଷ</span></div>
                 <div class="rule-item"><b>jna</b> → <span>ଜ୍ଞ</span></div>
+                <div class="rule-item"><b>shri</b> → <span>ଶ୍ରୀ</span></div>
                 <div class="rule-item"><b>ny</b> → <span>ନ୍ୟ</span></div>
                 <div class="rule-item"><b>nj</b> → <span>ଞ୍ଜ</span></div>
                 <div class="rule-item"><b>nk</b> / <b>nka</b> → <span>ଙ୍କ</span></div>
@@ -181,15 +202,6 @@
                 <div class="rule-item"><b>kra</b> → <span>କ୍ର</span></div>
                 <div class="rule-item"><b>kri</b> → <span>କ୍ରି</span></div>
                 <div class="rule-item"><b>kru</b> → <span>କ୍ରୁ</span></div>
-                <div class="rule-item"><b>gra</b> → <span>ଗ୍ର</span></div>
-                <div class="rule-item"><b>gri</b> → <span>ଗ୍ରି</span></div>
-                <div class="rule-item"><b>gru</b> → <span>ଗ୍ରୁ</span></div>
-                <div class="rule-item"><b>pra</b> → <span>ପ୍ର</span></div>
-                <div class="rule-item"><b>pri</b> → <span>ପ୍ରି</span></div>
-                <div class="rule-item"><b>pru</b> → <span>ପ୍ରୁ</span></div>
-                <div class="rule-item"><b>bra</b> → <span>ବ୍ର</span></div>
-                <div class="rule-item"><b>bri</b> → <span>ବ୍ରି</span></div>
-                <div class="rule-item"><b>bru</b> → <span>ବ୍ରୁ</span></div>
                 <div class="rule-item"><b>tra</b> → <span>ତ୍ର</span></div>
                 <div class="rule-item"><b>tri</b> → <span>ତ୍ରି</span></div>
                 <div class="rule-item"><b>tru</b> → <span>ତ୍ରୁ</span></div>
@@ -199,17 +211,22 @@
                 <div class="rule-item"><b>kRu</b> → <span>କୃ</span></div>
                 <div class="rule-item"><b>gRu</b> → <span>ଗୃ</span></div>
                 <div class="rule-item"><b>kamx</b> → <span>କମ୍</span></div>
-                <div class="rule-item"><b>sx</b> → <span>ସ୍</span></div>
-                <div class="rule-item"><b>lx</b> → <span>ଲ୍</span></div>
                 <div class="rule-item"><b>kx</b> → <span>କ୍</span></div>
               </div>
             </div>
           </details>
         </div>
+
       </aside>
+
     </section>
   </div>
 
+  <!-- PDF LIB -->
+  <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script> -->
+  
+  <!-- YOUR MAIN SCRIPT -->
   <script src="script.js"></script>
+
 </body>
 </html>
