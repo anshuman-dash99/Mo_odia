@@ -112,6 +112,7 @@ function getSafeNode() {
 
   let node = sel.getRangeAt(0).startContainer;
 
+  // If not text node → create one
   if (node.nodeType !== 3) {
     const textNode = document.createTextNode("");
     node.appendChild(textNode);
@@ -125,6 +126,7 @@ function getSafeNode() {
 
     return textNode;
   }
+
   return node;
 }
 
@@ -170,7 +172,6 @@ function resetState() {
   wordStartOffset = null;
   activeNode = null;
 }
-
 /* =========================
    SUGGESTIONS
 ========================= */
@@ -275,17 +276,43 @@ output.addEventListener("beforeinput", (e) => {
     return;
   }
 
+// ENTER
+// ENTER
   if (e.inputType === "insertParagraph") {
     e.preventDefault();
 
     const odia = transliterateWord(englishBuffer);
     replaceWord(odia);
 
-    document.execCommand("insertLineBreak");
-    resetState();
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+
+    // Insert <br> + NEW TEXT NODE (critical)
+    const br = document.createElement("br");
+    const newTextNode = document.createTextNode("");
+
+    range.insertNode(br);
+    range.setStartAfter(br);
+    range.insertNode(newTextNode);
+
+    // Move cursor into NEW LINE properly
+    const newRange = document.createRange();
+    newRange.setStart(newTextNode, 0);
+    newRange.collapse(true);
+
+    sel.removeAllRanges();
+    sel.addRange(newRange);
+
+    // 🔥 HARD RESET (important)
+    englishBuffer = "";
+    wordStartOffset = 0;
+    activeNode = newTextNode;
+
+    showSuggestions([]);
     return;
   }
-
   if (e.inputType === "insertText" && /[0-9]/.test(e.data)) {
     e.preventDefault();
 
@@ -327,6 +354,13 @@ output.addEventListener("beforeinput", (e) => {
 /* =========================
    CURSOR RESET
 ========================= */
+output.addEventListener("keydown", (e) => {
+    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Enter"].includes(e.key)) {
+        resetState();
+        showSuggestions([]);
+    }
+});
+
 output.addEventListener("mouseup", () => {
   resetState();
   showSuggestions([]);
