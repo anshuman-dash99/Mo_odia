@@ -43,12 +43,9 @@ const saveContent = () => {
 output.addEventListener("input", saveContent);
 
 window.addEventListener("load", () => {
-  const saved = localStorage.getItem("odia_text");
-  if (saved) {
-    output.innerHTML = saved;
-  }
+  output.innerHTML = "";
+  localStorage.removeItem("odia_text");
 });
-
 /* =========================
 //    PDF EXPORT 📄
 // ========================= */
