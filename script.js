@@ -189,9 +189,10 @@ function predictNextWord(limit = 5) {
   const text = output.innerText.trim();
   if (!text) return [];
 
-  const words = text.split(/\s+/);
+  const words = text.split(/\s+/).filter(Boolean);
   const n = words.length;
 
+  // 🔥 Prefer trigram
   if (n >= 2) {
     const key = words[n - 2] + " " + words[n - 1];
     if (trigram[key]) {
@@ -202,6 +203,7 @@ function predictNextWord(limit = 5) {
     }
   }
 
+  // 🔥 fallback bigram
   if (n >= 1 && bigram[words[n - 1]]) {
     return Object.entries(bigram[words[n - 1]])
       .sort((a, b) => b[1] - a[1])
@@ -334,12 +336,23 @@ output.addEventListener("beforeinput", (e) => {
     return;
   }
 
-  if (e.inputType === "insertText" && e.data === ",") {
+  if (e.inputType === "insertText" && e.data === " ") {
     e.preventDefault();
-    document.execCommand("insertText", false, ",");
+
+    const odia = transliterateWord(englishBuffer);
+    replaceWord(odia);
+
+    document.execCommand("insertText", false, " ");
+    resetState();
+
+    // 🔥 Delay prediction (CRITICAL FIX)
+    setTimeout(() => {
+      const predictions = predictNextWord();
+      showSuggestions(predictions);
+    }, 0);
+
     return;
   }
-
   if (e.inputType === "deleteContentBackward") {
     if (englishBuffer.length > 0) {
       e.preventDefault();
