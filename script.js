@@ -452,6 +452,7 @@ const consonants = {
   ch: "ଚ",
   jh: "ଝ",
   th: "ଥ",
+  Th: "ଠ",
   dh: "ଧ",
   Dh: "ଢ",
   ph: "ଫ",
