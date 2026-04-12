@@ -2,114 +2,113 @@ document.addEventListener("DOMContentLoaded", () => {
 
 const output = document.getElementById("output");
 const suggestionsBox = document.getElementById("suggestions");
-const clearBtn = document.getElementById("clearBtn");
-const copyBtn = document.getElementById("copyBtn");
-const pasteBtn = document.getElementById("pasteBtn");
+const langToggle = document.getElementById("langToggle");
 const themeToggle = document.getElementById("themeToggle");
-// const pdfBtn = document.getElementById("downloadPdf");
-const txtBtn = document.getElementById("downloadTxt");
 
 if (!output) return;
 
 output.contentEditable = true;
 
 /* =========================
-   THEME (🌗)
-========================= */
-// if (localStorage.getItem("theme") === "light") {
-//   document.body.classList.add("light");
-// }
-const updateThemeIcon = () => {
-  themeToggle.textContent = document.body.classList.contains("light")
-    ? "☀️ Light"
-    : "🌙 Dark";
-};
-themeToggle?.addEventListener("click", () => {
-  document.body.classList.toggle("light");
-
-  localStorage.setItem(
-    "theme",
-    document.body.classList.contains("light") ? "light" : "dark"
-  );
-});
-
-/* =========================
-   AUTO SAVE 💾
-========================= */
-const saveContent = () => {
-  localStorage.setItem("odia_text", output.innerHTML);
-};
-
-output.addEventListener("input", saveContent);
-
-window.addEventListener("load", () => {
-  output.innerHTML = "";
-  localStorage.removeItem("odia_text");
-});
-/* =========================
-//    PDF EXPORT 📄
-// ========================= */
-// pdfBtn?.addEventListener("click", () => {
-//   const opt = {
-//     margin: 10,
-//     filename: "odia-typing.pdf",
-//     image: { type: "jpeg", quality: 1 },
-//     html2canvas: { scale: 2 },
-//     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-//   };
-
-//   html2pdf().set(opt).from(output).save();
-// });
-
-// TEXT EXPORT
-txtBtn?.addEventListener("click", () => {
-  const text = output.innerText;
-
-  const blob = new Blob([text], { type: "text/plain" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "odia-text.txt";
-  a.click();
-
-  URL.revokeObjectURL(url);
-});
-/* =========================
    STATE
 ========================= */
 let englishBuffer = "";
 let wordStartOffset = null;
 let activeNode = null;
+let isNewLine = false;
+
+let trie = {}, bigram = {}, trigram = {};
+let modelsReady = false;
+
+let selectedIndex = -1;
+let isOdiaMode = true;
 
 /* =========================
-   LANGUAGE MODELS
+   LANGUAGE TOGGLE
 ========================= */
-let trie = {}, bigram = {}, trigram = {};
+function updateLangUI() {
+  langToggle.textContent = isOdiaMode ? "🌐 Odia" : "🌐 English";
+}
 
+langToggle?.addEventListener("click", () => {
+  isOdiaMode = !isOdiaMode;
+  resetState();
+  showSuggestions([]);
+  updateLangUI();
+});
+
+updateLangUI();
+
+/* =========================
+   THEME TOGGLE
+========================= */
+function applySavedTheme() {
+  const saved = localStorage.getItem("theme");
+
+  if (saved === "light") {
+    document.body.classList.add("light");
+  } else {
+    document.body.classList.remove("light");
+  }
+
+  updateThemeIcon();
+}
+
+function updateThemeIcon() {
+  if (!themeToggle) return;
+
+  themeToggle.textContent = document.body.classList.contains("light")
+    ? "☀️ Light"
+    : "🌙 Dark";
+}
+
+themeToggle?.addEventListener("click", () => {
+  document.body.classList.toggle("light");
+
+  const mode = document.body.classList.contains("light") ? "light" : "dark";
+  localStorage.setItem("theme", mode);
+
+  updateThemeIcon();
+});
+
+applySavedTheme();
+
+/* =========================
+   LOAD MODELS
+========================= */
 async function loadModels() {
-  trie = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/unigram.json").then(r => r.json());
-  bigram = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/bigram.json").then(r => r.json());
-  trigram = await fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/trigram.json").then(r => r.json());
+  try {
+    const [t, b, tr] = await Promise.all([
+      fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/unigram.json").then(r => r.json()),
+      fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/bigram.json").then(r => r.json()),
+      fetch("https://huggingface.co/datasets/ad1998/odia_dictionary/resolve/main/trigram.json").then(r => r.json())
+    ]);
+
+    trie = t;
+    bigram = b;
+    trigram = tr;
+
+    const custom = JSON.parse(localStorage.getItem("custom_dict") || "{}");
+    Object.keys(custom).forEach(k => {
+      trie[k] = (trie[k] || 0) + custom[k];
+    });
+
+    modelsReady = true;
+  } catch (e) {
+    console.error("Model load failed", e);
+  }
 }
 loadModels();
 
 /* =========================
    HELPERS
 ========================= */
-function ensureTextNode() {
-  if (!output.firstChild) {
-    output.appendChild(document.createTextNode(""));
-  }
-}
-
 function getSafeNode() {
   const sel = window.getSelection();
   if (!sel.rangeCount) return null;
 
   let node = sel.getRangeAt(0).startContainer;
 
-  // If not text node → create one
   if (node.nodeType !== 3) {
     const textNode = document.createTextNode("");
     node.appendChild(textNode);
@@ -123,25 +122,24 @@ function getSafeNode() {
 
     return textNode;
   }
-
   return node;
 }
 
-/* =========================
-   WORD REPLACEMENT
-========================= */
 function replaceWord(newWord) {
   const sel = window.getSelection();
   if (!sel.rangeCount) return;
 
-  ensureTextNode();
-
-  const range = sel.getRangeAt(0);
   let node = getSafeNode();
+  const range = sel.getRangeAt(0);
 
-  if (wordStartOffset === null || activeNode !== node) {
+  if (wordStartOffset === null || activeNode !== node || isNewLine) {
     wordStartOffset = range.startOffset;
     activeNode = node;
+    isNewLine = false;
+  }
+
+  if (wordStartOffset > node.textContent.length) {
+    wordStartOffset = node.textContent.length;
   }
 
   const text = node.textContent;
@@ -161,35 +159,51 @@ function replaceWord(newWord) {
   sel.addRange(newRange);
 }
 
-/* =========================
-   RESET
-========================= */
 function resetState() {
   englishBuffer = "";
   wordStartOffset = null;
   activeNode = null;
+  selectedIndex = -1;
 }
+
+/* =========================
+   AUTO LEARN
+========================= */
+function learnWord(word) {
+  if (!word) return;
+
+  let custom = JSON.parse(localStorage.getItem("custom_dict") || "{}");
+  custom[word] = (custom[word] || 0) + 1;
+
+  localStorage.setItem("custom_dict", JSON.stringify(custom));
+}
+
 /* =========================
    SUGGESTIONS
 ========================= */
 function getTrieSuggestions(prefix, limit = 5) {
   if (!prefix) return [];
 
-  return Object.entries(trie)
-    .filter(([w]) => w.startsWith(prefix))
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(e => e[0]);
+  if (!modelsReady) return [prefix];
+
+  prefix = prefix.trim();
+
+  return Object.keys(trie)
+    .filter(w => w.startsWith(prefix))
+    .slice(0, 50)
+    .sort((a, b) => (trie[b] || 0) - (trie[a] || 0))
+    .slice(0, limit);
 }
 
 function predictNextWord(limit = 5) {
+  if (!modelsReady) return [];
+
   const text = output.innerText.trim();
   if (!text) return [];
 
-  const words = text.split(/\s+/).filter(Boolean);
+  const words = text.split(/\s+/);
   const n = words.length;
 
-  // 🔥 Prefer trigram
   if (n >= 2) {
     const key = words[n - 2] + " " + words[n - 1];
     if (trigram[key]) {
@@ -200,7 +214,6 @@ function predictNextWord(limit = 5) {
     }
   }
 
-  // 🔥 fallback bigram
   if (n >= 1 && bigram[words[n - 1]]) {
     return Object.entries(bigram[words[n - 1]])
       .sort((a, b) => b[1] - a[1])
@@ -216,6 +229,7 @@ function predictNextWord(limit = 5) {
 ========================= */
 function showSuggestions(list) {
   suggestionsBox.innerHTML = "";
+  selectedIndex = -1;
 
   if (!list || list.length === 0) {
     suggestionsBox.style.display = "none";
@@ -224,7 +238,7 @@ function showSuggestions(list) {
 
   suggestionsBox.style.display = "flex";
 
-  list.forEach(word => {
+  list.forEach((word) => {
     const el = document.createElement("span");
     el.className = "suggestion";
     el.innerText = word;
@@ -241,6 +255,7 @@ function showSuggestions(list) {
 function insertSuggestion(word) {
   replaceWord(word);
   document.execCommand("insertText", false, " ");
+  learnWord(word);
   resetState();
   showSuggestions([]);
 }
@@ -250,107 +265,103 @@ function insertSuggestion(word) {
 ========================= */
 output.addEventListener("beforeinput", (e) => {
 
+  // LETTER
   if (e.inputType === "insertText" && /^[a-zA-Z]$/.test(e.data)) {
+
+    if (!isOdiaMode) return;
+
     e.preventDefault();
 
     englishBuffer += e.data;
 
     const odia = transliterateWord(englishBuffer);
+    if (!odia) return;
+
     replaceWord(odia);
 
     showSuggestions(getTrieSuggestions(odia));
+
     return;
   }
 
+  // SPACE
   if (e.inputType === "insertText" && e.data === " ") {
+
+    if (!isOdiaMode) return;
+
     e.preventDefault();
 
     const odia = transliterateWord(englishBuffer);
     replaceWord(odia);
+    learnWord(odia);
 
     document.execCommand("insertText", false, " ");
     resetState();
 
-    showSuggestions(predictNextWord());
-    return;
-  }
-
-// ENTER
-// ENTER
-  if (e.inputType === "insertParagraph") {
-    e.preventDefault();
-
-    const odia = transliterateWord(englishBuffer);
-    replaceWord(odia);
-
-    const sel = window.getSelection();
-    if (!sel.rangeCount) return;
-
-    const range = sel.getRangeAt(0);
-
-    // Insert <br> + NEW TEXT NODE (critical)
-    const br = document.createElement("br");
-    const newTextNode = document.createTextNode("");
-
-    range.insertNode(br);
-    range.setStartAfter(br);
-    range.insertNode(newTextNode);
-
-    // Move cursor into NEW LINE properly
-    const newRange = document.createRange();
-    newRange.setStart(newTextNode, 0);
-    newRange.collapse(true);
-
-    sel.removeAllRanges();
-    sel.addRange(newRange);
-
-    // 🔥 HARD RESET (important)
-    englishBuffer = "";
-    wordStartOffset = 0;
-    activeNode = newTextNode;
-
-    showSuggestions([]);
-    return;
-  }
-  if (e.inputType === "insertText" && /[0-9]/.test(e.data)) {
-    e.preventDefault();
-
-    const map = ["୦","୧","୨","୩","୪","୫","୬","୭","୮","୯"];
-    document.execCommand("insertText", false, map[e.data]);
-    resetState();
-    return;
-  }
-
-  if (e.inputType === "insertText" && e.data === "$") {
-    e.preventDefault();
-    document.execCommand("insertText", false, "₹");
-    return;
-  }
-
-  if (e.inputType === "insertText" && e.data === ".") {
-    e.preventDefault();
-    document.execCommand("insertText", false, "।");
-    return;
-  }
-
-  if (e.inputType === "insertText" && e.data === " ") {
-    e.preventDefault();
-
-    const odia = transliterateWord(englishBuffer);
-    replaceWord(odia);
-
-    document.execCommand("insertText", false, " ");
-    resetState();
-
-    // 🔥 Delay prediction (CRITICAL FIX)
     setTimeout(() => {
-      const predictions = predictNextWord();
-      showSuggestions(predictions);
+      showSuggestions(predictNextWord());
     }, 0);
 
     return;
   }
+
+  // ENTER
+  if (e.inputType === "insertParagraph") {
+
+    if (!isOdiaMode) return;
+
+    e.preventDefault();
+
+    const odia = transliterateWord(englishBuffer);
+    replaceWord(odia);
+    learnWord(odia);
+
+    const sel = window.getSelection();
+    if (!sel.rangeCount) return;
+
+    let node = sel.getRangeAt(0).startContainer;
+
+    // Find parent DIV line
+    while (node && node !== output && node.nodeName !== "DIV") {
+      node = node.parentNode;
+    }
+
+    // Wrap first line if needed
+    if (node === output || !node) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = output.innerHTML || "";
+      output.innerHTML = "";
+      output.appendChild(wrapper);
+      node = wrapper;
+    }
+
+    // ✅ Create new line with ZERO WIDTH SPACE
+    const newLine = document.createElement("div");
+    const textNode = document.createTextNode("\u200B"); // invisible char
+    newLine.appendChild(textNode);
+
+    node.after(newLine);
+
+    // ✅ Move cursor AFTER invisible char
+    const range = document.createRange();
+    range.setStart(textNode, 1);
+    range.collapse(true);
+
+    sel.removeAllRanges();
+    sel.addRange(range);
+
+    resetState();
+    isNewLine = true;
+
+    showSuggestions([]);
+
+    return;
+  }
+  // BACKSPACE
   if (e.inputType === "deleteContentBackward") {
+
+    if (!isOdiaMode) return;
+
     if (englishBuffer.length > 0) {
       e.preventDefault();
       englishBuffer = englishBuffer.slice(0, -1);
@@ -358,56 +369,49 @@ output.addEventListener("beforeinput", (e) => {
     } else {
       resetState();
     }
+
+    return;
+  }
+
+  // NUMBERS
+  if (e.inputType === "insertText" && /[0-9]/.test(e.data)) {
+    if (!isOdiaMode) return;
+
+    e.preventDefault();
+    const map = ["୦","୧","୨","୩","୪","୫","୬","୭","୮","୯"];
+    document.execCommand("insertText", false, map[e.data]);
+    return;
+  }
+
+  // FULL STOP
+  if (e.inputType === "insertText" && e.data === ".") {
+    if (!isOdiaMode) return;
+
+    e.preventDefault();
+    document.execCommand("insertText", false, "।");
+    return;
   }
 });
 
 /* =========================
-   CURSOR RESET
+   RESET EVENTS
 ========================= */
-output.addEventListener("keydown", (e) => {
-    if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Enter"].includes(e.key)) {
-        resetState();
-        showSuggestions([]);
-    }
-});
-
 output.addEventListener("mouseup", () => {
   resetState();
   showSuggestions([]);
 });
 
 output.addEventListener("keyup", (e) => {
-  if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)) {
+  if (["ArrowLeft","ArrowRight"].includes(e.key)) {
     resetState();
     showSuggestions([]);
   }
 });
 
-/* =========================
-   BUTTONS
-========================= */
-clearBtn.onclick = () => {
-  output.innerHTML = "";
-  localStorage.removeItem("odia_text");
-};
+// ⚠️ DO NOT TOUCH YOUR TRANSLITERATION ENGINE
+// (paste your full engine here unchanged)
 
-copyBtn.onclick = () => {
-  navigator.clipboard.writeText(output.innerText);
-};
-
-pasteBtn.onclick = async () => {
-  const text = await navigator.clipboard.readText();
-  document.execCommand("insertText", false, text);
-};
-
-/* =========================
-
-/* =========================
-   YOUR TRANSLITERATION RULE ENGINE
-   (UNCHANGED FROM YOUR CODE)
-========================= */
-
-// Keep ALL your mappings exactly same here
+//transword  logic
 
 const independentVowels = {
   RRu: "ୠ",
@@ -936,4 +940,4 @@ function transliterateText(text) {
 // transliterateText etc.
 // (Do NOT modify your rule logic)
 
-});
+}); 
